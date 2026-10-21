@@ -1,0 +1,484 @@
+{
+  "id": "wan22-ti2v-5b-768x768",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 10,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "wan2.2_ti2v_5B_fp16.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "wan2.2_ti2v_5B_fp16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        320,
+        105
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2,
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "type": "wan",
+        "device": "default"
+      }
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        40,
+        390
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            4,
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "wan2.2_vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "wan2.2_vae.safetensors"
+      }
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [
+        400,
+        100
+      ],
+      "size": [
+        400,
+        150
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "title": "Positive Prompt (正面提示词)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "A cinematic shot, high quality, highly detailed, photorealistic 768p video."
+      ],
+      "widgets_values_named": {
+        "text": "A cinematic shot, high quality, highly detailed, photorealistic 768p video."
+      }
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        400,
+        300
+      ],
+      "size": [
+        400,
+        150
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "title": "Negative Prompt (负面提示词)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "色调艳丽，过曝，静态，扭曲，低质量，模糊，残影，变形，jitter, artifacts, blurry, bad anatomy"
+      ],
+      "widgets_values_named": {
+        "text": "色调艳丽，过曝，静态，扭曲，低质量，模糊，残影，变形，jitter, artifacts, blurry, bad anatomy"
+      }
+    },
+    {
+      "id": 6,
+      "type": "Wan22ImageToVideoLatent",
+      "pos": [
+        400,
+        500
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 4
+        },
+        {
+          "name": "start_image",
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "title": "Wan 2.2 TI2V Latent (768x768)",
+      "properties": {
+        "Node name for S&R": "Wan22ImageToVideoLatent"
+      },
+      "widgets_values": [
+        768,
+        768,
+        49,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 768,
+        "height": 768,
+        "length": 49,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 7,
+      "type": "KSampler",
+      "pos": [
+        850,
+        100
+      ],
+      "size": [
+        300,
+        480
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 5
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        123456789,
+        "randomize",
+        25,
+        6.0,
+        "euler",
+        "simple",
+        1.0
+      ],
+      "widgets_values_named": {
+        "seed": 123456789,
+        "control_after_generate": "randomize",
+        "steps": 25,
+        "cfg": 6.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0
+      }
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [
+        1200,
+        100
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 9,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        1480,
+        100
+      ],
+      "size": [
+        400,
+        520
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 16,
+        "loop_count": 0,
+        "filename_prefix": "Wan22_TI2V_5B_768p",
+        "format": "video/h264-mp4",
+        "pingpong": false,
+        "save_output": true
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      7,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      2,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      3,
+      0,
+      6,
+      0,
+      "VAE"
+    ],
+    [
+      5,
+      4,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      5,
+      0,
+      7,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      6,
+      0,
+      7,
+      3,
+      "LATENT"
+    ],
+    [
+      8,
+      3,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      9,
+      7,
+      0,
+      8,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      8,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

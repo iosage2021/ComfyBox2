@@ -3,6 +3,9 @@
 import http.server
 import socketserver
 import argparse
+import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-l", "--listen", type=str, default="localhost", help="Listen address for ComfyBox server")
@@ -50,6 +53,43 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     }
 
 
+    def end_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):
+        clean_path = self.path.split("?")[0]
+        if clean_path in ("/api/workflows", "/api/workflows/"):
+            workflows_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflows")
+            list_file = os.path.join(workflows_dir, "list.json")
+            if os.path.exists(list_file):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                with open(list_file, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+        elif clean_path.startswith("/workflows/"):
+            fname = clean_path[len("/workflows/"):]
+            dist_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflows", fname)
+            comfy_file = os.path.join("/home/iosage/git/ComfyUI/user/default/workflows", fname)
+            if not os.path.exists(dist_file) and os.path.exists(comfy_file):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                with open(comfy_file, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+        super().do_GET()
+
+
+socketserver.TCPServer.allow_reuse_address = True
 httpd = socketserver.TCPServer((args.listen, args.port), HttpRequestHandler)
 
 try:

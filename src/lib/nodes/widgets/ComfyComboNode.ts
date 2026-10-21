@@ -9,6 +9,7 @@ import ComfyWidgetNode from "./ComfyWidgetNode";
 
 export interface ComfyComboProperties extends ComfyWidgetProperties {
     values: string[]
+    imageUpload?: boolean
 
     /* JS Function body that takes a parameter named "value" as a parameter and returns the label for each combo entry */
     convertValueToLabelCode: string
@@ -19,7 +20,8 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
         tags: [],
         defaultValue: "A",
         values: ["A", "B", "C", "D"],
-        convertValueToLabelCode: ""
+        convertValueToLabelCode: "",
+        imageUpload: false
     }
 
     static slotLayout: SlotLayout = {
@@ -33,7 +35,7 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
     }
 
     override svelteComponentType = ComboWidget
-    override defaultValue = "A";
+    override defaultValue = "";
     override saveUserState = false;
 
     // True if at least one combo box refresh has taken place
@@ -44,7 +46,7 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
     maxLabelWidthChars: number = 0;
 
     constructor(name?: string) {
-        super(name, "A")
+        super(name, "")
         this.firstLoad = writable(false)
         this.lightUp = writable(true)
         this.valuesForCombo = writable([])
@@ -60,11 +62,21 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
         if (values == null)
             return;
 
+        if (!Array.isArray(values)) {
+            if (typeof values === "string") {
+                values = [values];
+            } else if (typeof values === "object") {
+                values = Object.values(values);
+            } else {
+                values = [];
+            }
+        }
+
         let changed = this.properties.values != values;
         this.properties.values = values;
 
         const oldValue = get(this.value)
-        if (this.properties.values.indexOf(oldValue) === -1) {
+        if (Array.isArray(this.properties.values) && this.properties.values.indexOf(oldValue) === -1) {
             changed = true;
             this.value.set(defaultValue || this.properties.values[0])
         }
@@ -83,27 +95,31 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
         let valuesForCombo = []
 
         try {
-            valuesForCombo = this.properties.values.map((value, index) => {
-                const label = formatter(value);
-                this.maxLabelWidthChars = Math.max(this.maxLabelWidthChars, label.length)
-                return {
-                    value,
-                    label,
-                    index
-                }
-            })
+            if (Array.isArray(this.properties.values)) {
+                valuesForCombo = this.properties.values.map((value, index) => {
+                    const label = formatter(value);
+                    this.maxLabelWidthChars = Math.max(this.maxLabelWidthChars, String(label).length)
+                    return {
+                        value,
+                        label,
+                        index
+                    }
+                })
+            }
         }
         catch (err) {
             console.error("Failed formatting!", err)
-            valuesForCombo = this.properties.values.map((value, index) => {
-                const label = `${value}`
-                this.maxLabelWidthChars = Math.max(this.maxLabelWidthChars, label.length)
-                return {
-                    value,
-                    label,
-                    index
-                }
-            })
+            if (Array.isArray(this.properties.values)) {
+                valuesForCombo = this.properties.values.map((value, index) => {
+                    const label = `${value}`
+                    this.maxLabelWidthChars = Math.max(this.maxLabelWidthChars, String(label).length)
+                    return {
+                        value,
+                        label,
+                        index
+                    }
+                })
+            }
         }
 
         this.firstLoad.set(true)

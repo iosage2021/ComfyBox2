@@ -143,7 +143,18 @@ export type ComfyExecutionError = ComfyInterruptedError & {
 }
 
 export function formatValidationError(error: ComfyAPIPromptErrorResponse) {
-    return `${error.error.message}: ${error.error.details}`
+    let msg = `${error.error.message || "Prompt outputs failed validation"}`
+    if (error.error.details) {
+        msg += `: ${error.error.details}`
+    }
+    if (error.node_errors && typeof error.node_errors === "object") {
+        const details = Object.entries(error.node_errors).map(([nid, nerr]) => {
+            const errDetails = (nerr.errors || []).map(e => `${e.message} (${e.details})`).join('; ')
+            return `${nerr.class_type || "Node"}: ${errDetails}`
+        }).join('\n')
+        if (details) msg += `\n${details}`
+    }
+    return msg
 }
 
 export function formatExecutionError(error: ComfyExecutionError) {

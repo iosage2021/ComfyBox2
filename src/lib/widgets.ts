@@ -79,14 +79,21 @@ const STRING: WidgetFactory = {
 
 const COMBO: WidgetFactory = {
     callback: (node: LGraphNode, inputName: string, inputData: ComfyNodeDefInput): IComfyInputSlot => {
-        const type = inputData[0] as string[];
-        let defaultValue = type[0];
-        if (inputData[1] && inputData[1].default) {
-            defaultValue = inputData[1].default;
+        let type = inputData[0] as string[];
+        const opts = inputData[1];
+        if (!Array.isArray(type)) {
+            if (opts && Array.isArray((opts as any).options)) {
+                type = (opts as any).options;
+            } else if (opts && Array.isArray((opts as any).values)) {
+                type = (opts as any).values;
+            } else {
+                type = [];
+            }
         }
+        let defaultValue = (opts && (opts.default || opts.defaultValue)) || type[0] || "";
         return addComfyInput(node, inputName, { type: "string", config: { values: type, defaultValue }, defaultWidgetNode: ComfyComboNode })
     },
-    inputType: "number",
+    inputType: "string",
     nodeType: "ui/combo",
     addedWidgetCount: 1
 }

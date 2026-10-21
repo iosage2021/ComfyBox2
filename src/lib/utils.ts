@@ -285,7 +285,7 @@ export function getNodeInfo(nodeId: ComfyNodeID): string {
     return title + " (" + displayNodeID + ")"
 }
 
-export const debounce = (callback: Function, wait = 250) => {
+export function debounce(callback: Function, wait = 250) {
     let timeout: NodeJS.Timeout | null = null;
     return (...args: Array<unknown>) => {
         const next = () => callback(...args);
@@ -293,7 +293,7 @@ export const debounce = (callback: Function, wait = 250) => {
 
         timeout = setTimeout(next, wait);
     };
-};
+}
 
 export function convertComfyOutputToGradio(output: SerializedPromptOutput): GradioFileData[] {
     return output.images.map(convertComfyOutputEntryToGradio);

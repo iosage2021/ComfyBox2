@@ -180,8 +180,8 @@ function getWidgetTypesFromConfig(inputName: string, inputType: ComfyNodeDefInpu
     let widgetInputType = null;
     let addedWidgetCount = 1;
 
-    if (Array.isArray(inputType)) {
-        // Combo options of string[]
+    if (Array.isArray(inputType) || inputType === "COMBO") {
+        // Combo options of string[] or modern ComfyUI "COMBO"
         widgetNodeType = "ui/combo";
         widgetInputType = "string"
         addedWidgetCount = 1;
@@ -208,16 +208,28 @@ function getWidgetTypesFromConfig(inputName: string, inputType: ComfyNodeDefInpu
     return [widgetNodeType, widgetInputType, addedWidgetCount]
 }
 
-function configureWidgetNodeProperties(serWidgetNode: SerializedComfyWidgetNode, inputOpts?: ComfyNodeDefInputOptions) {
+function configureWidgetNodeProperties(serWidgetNode: SerializedComfyWidgetNode, inputOpts?: ComfyNodeDefInputOptions, inputType?: any) {
     inputOpts ||= {}
     switch (serWidgetNode.type) {
         case `ui/number`:
-            serWidgetNode.properties.min = inputOpts.min || 0;
-            serWidgetNode.properties.max = inputOpts.max || 100;
-            serWidgetNode.properties.step = inputOpts.step || 1;
+            serWidgetNode.properties.min = inputOpts.min ?? 0;
+            serWidgetNode.properties.max = inputOpts.max ?? 100;
+            serWidgetNode.properties.step = inputOpts.step ?? 1;
             break;
         case "ui/text":
             serWidgetNode.properties.multiline = inputOpts.multiline || false;
+            break;
+        case "ui/combo":
+            if (Array.isArray(inputType)) {
+                serWidgetNode.properties.values = inputType;
+            } else if (inputOpts && Array.isArray((inputOpts as any).options)) {
+                serWidgetNode.properties.values = (inputOpts as any).options;
+            } else if (inputOpts && Array.isArray((inputOpts as any).values)) {
+                serWidgetNode.properties.values = (inputOpts as any).values;
+            }
+            if ((inputOpts as any)?.image_upload || (Array.isArray(inputType) && inputType.some((v: any) => typeof v === "string" && /\.(png|jpe?g|webp|gif|bmp)$/i.test(v)))) {
+                serWidgetNode.properties.imageUpload = true;
+            }
             break;
     }
 }
@@ -426,17 +438,25 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
 
             let [widgetNodeType, widgetInputType, widgetCount] = pair
 
-            if (convertedWidget != null) {
-                // This input is an extra input slot on the node that should be
-                // accounted for.
-                const values = node.widgets_values.splice(0, widgetCount);
-                const value = values[0]
-                // TODO
+            if (convertedWidget != null && convertedWidget.link != null) {
+                // This input is already connected to another node via a wire
+                if (node.widgets_values && node.widgets_values.length > 0) {
+                    node.widgets_values.splice(0, widgetCount);
+                }
+                continue;
             }
-            else {
-                // This input is a widget, it should be converted to an input
-                // connected to a ComfyWidgetNode.
 
+            let connInputIndex: number;
+            if (convertedWidget != null) {
+                // Widget was listed in node.inputs by modern ComfyUI without link
+                connInputIndex = node.inputs.indexOf(convertedWidget);
+                convertedWidget.type = widgetInputType;
+                (convertedWidget as IComfyInputSlot).config = inputOpts;
+                (convertedWidget as IComfyInputSlot).defaultWidgetNode = null;
+                (convertedWidget as IComfyInputSlot).widgetNodeType = widgetNodeType;
+                (convertedWidget as IComfyInputSlot).serialize = true;
+                convertedWidget.properties ||= {};
+            } else {
                 const newInput: IComfyInputSlot = {
                     name: inputName,
                     link: null,
@@ -450,45 +470,72 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
 
                 node.inputs ||= []
                 node.inputs.push(newInput);
-                const connInputIndex = node.inputs.length - 1;
+                connInputIndex = node.inputs.length - 1;
+            }
 
-                // Now get the widget value.
-                //
-                // Assumes the value is the first in the widget list for the
-                // case of e.g. the seed randomizer
-                // That input type adds a number widget and a combo widget so
-                // the widgets_values will have entries like
-                //
-                // [ 8, "randomize", ... ]
-                //
-                // Only care about 8 and want to skip "randomize", that's the purpose of `widgetCount`
-                const values = node.widgets_values.splice(0, widgetCount);
-                const value = values[0]
+            // Now get the widget value.
+            //
+            // Assumes the value is the first in the widget list for the
+            // case of e.g. the seed randomizer
+            // That input type adds a number widget and a combo widget so
+            // the widgets_values will have entries like
+            //
+            // [ 8, "randomize", ... ]
+            //
+            // Only care about 8 and want to skip "randomize", that's the purpose of `widgetCount`
+            const values = node.widgets_values && node.widgets_values.length > 0 ? node.widgets_values.splice(0, widgetCount) : [];
+            let value = (node as any).widgets_values_named?.[inputName] !== undefined
+                ? (node as any).widgets_values_named[inputName]
+                : values[0];
 
-                const [comfyWidgetNode, serWidgetNode] = createSerializedWidgetNode(
-                    vanillaWorkflow,
-                    widgetNodeType,
-                    value,
-                    node,
-                    connInputIndex,
-                    true
-                );
-
-                configureWidgetNodeProperties(serWidgetNode, inputOpts)
-
-                if (group == null)
-                    group = layoutState.addContainer(isOutputNode ? right : left, { title: node.title || node.type })
-
-                const widget = layoutState.addWidget(group, comfyWidgetNode)
-                widget.attrs.title = inputName;
-
-                const connOutputIndex = serWidgetNode.outputs?.findIndex(o => o.name === comfyWidgetNode.outputSlotName)
-                if (connOutputIndex != null) {
-                    connectSerializedNodes(vanillaWorkflow, serWidgetNode, connOutputIndex, node, connInputIndex)
+            if (value === undefined) {
+                if (Array.isArray(inputType)) {
+                    value = (inputOpts as any)?.default ?? (inputOpts as any)?.defaultValue ?? inputType[0];
+                } else if (inputType === "COMBO" && inputOpts && Array.isArray((inputOpts as any).options)) {
+                    value = (inputOpts as any)?.default ?? (inputOpts as any)?.defaultValue ?? (inputOpts as any).options[0];
+                } else if (inputOpts && ("default" in inputOpts || "defaultValue" in inputOpts)) {
+                    value = (inputOpts as any).default ?? (inputOpts as any).defaultValue;
+                } else if (widgetNodeType === "ui/number") {
+                    value = inputOpts?.min ?? 0;
+                } else if (widgetNodeType === "ui/toggle") {
+                    value = false;
+                } else if (widgetNodeType === "ui/text") {
+                    value = "";
                 }
-                else {
-                    console.error("[convertVanillaWorkflow] No output to connect converted widget into!", comfyWidgetNode.outputSlotName, node)
-                }
+            }
+
+            const [comfyWidgetNode, serWidgetNode] = createSerializedWidgetNode(
+                vanillaWorkflow,
+                widgetNodeType,
+                value,
+                node,
+                connInputIndex,
+                true
+            );
+
+            configureWidgetNodeProperties(serWidgetNode, inputOpts, inputType)
+            if (serWidgetNode.properties.values) {
+                (comfyWidgetNode as any).properties.values = serWidgetNode.properties.values;
+            }
+            if ((serWidgetNode.properties as any).imageUpload) {
+                (comfyWidgetNode as any).properties.imageUpload = true;
+            }
+            if (value !== undefined) {
+                comfyWidgetNode.setValue(value);
+            }
+
+            if (group == null)
+                group = layoutState.addContainer(isOutputNode ? right : left, { title: node.title || node.type })
+
+            const widget = layoutState.addWidget(group, comfyWidgetNode)
+            widget.attrs.title = (convertedWidget as any)?.localized_name || inputName;
+
+            const connOutputIndex = serWidgetNode.outputs?.findIndex(o => o.name === comfyWidgetNode.outputSlotName)
+            if (connOutputIndex != null) {
+                connectSerializedNodes(vanillaWorkflow, serWidgetNode, connOutputIndex, node, connInputIndex)
+            }
+            else {
+                console.error("[convertVanillaWorkflow] No output to connect converted widget into!", comfyWidgetNode.outputSlotName, node)
             }
         }
 

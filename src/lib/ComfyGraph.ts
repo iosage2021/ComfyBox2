@@ -1,5 +1,4 @@
 import { LConnectionKind, LGraph, LGraphNode, type INodeSlot, type SlotIndex, LiteGraph, getStaticProperty, type LGraphAddNodeOptions, LGraphCanvas, type LGraphRemoveNodeOptions, Subgraph, type LGraphAddNodeMode, type SerializedLGraphNode, type Vector2, type NodeID, reassignGraphIDs, type GraphIDMapping, type SerializedLGraph } from "@litegraph-ts/core";
-import GraphSync from "./GraphSync";
 import EventEmitter from "events";
 import type TypedEmitter from "typed-emitter";
 import uiState from "./stores/uiState";

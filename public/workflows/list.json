@@ -1,0 +1,146 @@
+[
+  {
+    "filename": "111.json",
+    "name": "111",
+    "category": "Other",
+    "description": ""
+  },
+  {
+    "filename": "111_sulphur2.json",
+    "name": "111_sulphur2",
+    "category": "Other",
+    "description": ""
+  },
+  {
+    "filename": "Vantage-Sulphur-2-Wth-Preview-Workflow.json",
+    "name": "Vantage-Sulphur-2-Wth-Preview-Workflow",
+    "category": "Other",
+    "description": ""
+  },
+  {
+    "filename": "conditioningRegions.json",
+    "name": "conditioningRegions",
+    "category": "Templates",
+    "description": "区域条件分块控制"
+  },
+  {
+    "filename": "defaultWorkflow.json",
+    "name": "defaultWorkflow",
+    "category": "Templates",
+    "description": "ComfyBox 基础默认工作流 (SD1.5)"
+  },
+  {
+    "filename": "framepack_f1_2_images.json",
+    "name": "framepack_f1_2_images",
+    "category": "FramePack",
+    "description": "FramePack 长视频/超分生成"
+  },
+  {
+    "filename": "framepack_f1_example.json",
+    "name": "framepack_f1_example",
+    "category": "FramePack",
+    "description": "FramePack 长视频/超分生成"
+  },
+  {
+    "filename": "framepack_f1_prompt_lora.json",
+    "name": "framepack_f1_prompt_lora",
+    "category": "FramePack",
+    "description": "FramePack 长视频/超分生成"
+  },
+  {
+    "filename": "img2imgMasked.json",
+    "name": "img2imgMasked",
+    "category": "Templates",
+    "description": "蒙版图生图 (Inpainting)"
+  },
+  {
+    "filename": "minimax_h3_turbo_i2va.json",
+    "name": "minimax_h3_turbo_i2va",
+    "category": "MiniMax / Veda",
+    "description": "MiniMax 图生视频 (I2VA)"
+  },
+  {
+    "filename": "minimax_h3_turbo_t2va_i2va.json",
+    "name": "minimax_h3_turbo_t2va_i2va",
+    "category": "MiniMax / Veda",
+    "description": "MiniMax 图文生视频 (T2VA & I2VA)"
+  },
+  {
+    "filename": "minimax_h3_turbo_t2va_i2va_veda.json",
+    "name": "minimax_h3_turbo_t2va_i2va_veda",
+    "category": "MiniMax / Veda",
+    "description": "MiniMax 图文生视频 (T2VA & I2VA)"
+  },
+  {
+    "filename": "qwen-image-2.1-turbo-gguf.json",
+    "name": "qwen-image-2.1-turbo-gguf",
+    "category": "Qwen Image",
+    "description": "Qwen 2.1 Turbo GGUF 量化版"
+  },
+  {
+    "filename": "qwen-image-2.1-turbo-image-edit.json",
+    "name": "qwen-image-2.1-turbo-image-edit",
+    "category": "Qwen Image",
+    "description": "Qwen 2.1 Turbo 图像编辑 (Image Edit)"
+  },
+  {
+    "filename": "qwen-image-2.1-turbo-multi-ref.json",
+    "name": "qwen-image-2.1-turbo-multi-ref",
+    "category": "Qwen Image",
+    "description": "Qwen 2.1 Turbo 多图参考 (Multi-Ref)"
+  },
+  {
+    "filename": "qwen-image-2.1-turbo-t2i.json",
+    "name": "qwen-image-2.1-turbo-t2i",
+    "category": "Qwen Image",
+    "description": "Qwen 2.1 Turbo 文生图 (Text-to-Image)"
+  },
+  {
+    "filename": "qwen-image-workflow.json",
+    "name": "qwen-image-workflow",
+    "category": "Qwen Image",
+    "description": "Qwen 工作流"
+  },
+  {
+    "filename": "upscaleByModel.json",
+    "name": "upscaleByModel",
+    "category": "Templates",
+    "description": "模型超分辨率放大"
+  },
+  {
+    "filename": "veda_minimax_h3_r2va.json",
+    "name": "veda_minimax_h3_r2va",
+    "category": "MiniMax / Veda",
+    "description": "MiniMax 动作/参考迁移生视频"
+  },
+  {
+    "filename": "veda_minimax_h3_t2va.json",
+    "name": "veda_minimax_h3_t2va",
+    "category": "MiniMax / Veda",
+    "description": "MiniMax 文生视频 (T2VA)"
+  },
+  {
+    "filename": "wan2.1_i2v_14b_gguf.json",
+    "name": "wan2.1_i2v_14b_gguf",
+    "category": "Wan Video",
+    "description": "Wan 图生视频 (Image-to-Video)"
+  },
+  {
+    "filename": "wan2.1_t2v_14b_gguf.json",
+    "name": "wan2.1_t2v_14b_gguf",
+    "category": "Wan Video",
+    "description": "Wan 文生视频 (Text-to-Video)"
+  },
+  {
+    "filename": "wan2.2_i2v_5b_768x768.json",
+    "name": "wan2.2_i2v_5b_768x768",
+    "category": "Wan Video",
+    "description": "Wan 图生视频 (Image-to-Video)"
+  },
+  {
+    "filename": "wan2.2_ti2v_5b_768x768.json",
+    "name": "wan2.2_ti2v_5b_768x768",
+    "category": "Wan Video",
+    "description": "Wan 图生视频 (Image-to-Video)"
+  }
+]

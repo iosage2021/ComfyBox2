@@ -101,7 +101,8 @@
              }
          },
          {
-             path: '/workflows',
+             path: '/workflows/',
+             alias: '/workflows',
              component: WorkflowsPage,
              options: {
                  props: { app }

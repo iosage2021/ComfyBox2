@@ -153,12 +153,12 @@ export type VanillaWorkflowConvertResult = {
     missingNodeTypes: Set<string>
 }
 
-function isComfyBoxWorkflow(data: any): data is SerializedAppState {
+export function isComfyBoxWorkflow(data: any): data is SerializedAppState {
     return data != null && (typeof data === "object") && data.comfyBoxWorkflow;
 }
 
-function isVanillaWorkflow(data: any): data is SerializedLGraph {
-    return data != null && (typeof data === "object") && data.last_node_id != null;
+export function isVanillaWorkflow(data: any): data is SerializedLGraph {
+    return data != null && (typeof data === "object") && (data.last_node_id != null || Array.isArray(data.nodes));
 }
 
 type BackendNodeDef = {
@@ -827,7 +827,7 @@ export default class ComfyApp {
         return workflow;
     }
 
-    async openVanillaWorkflow(data: SerializedLGraph, filename: string) {
+    async openVanillaWorkflow(data: SerializedLGraph, filename: string): Promise<ComfyBoxWorkflow> {
         const title = basename(filename)
 
         const attrs: WorkflowAttributes = {
@@ -842,39 +842,81 @@ export default class ComfyApp {
 
         const [comfyBoxWorkflow, layoutState] = convertVanillaWorkflow(data, attrs);
 
-        const addWorkflow = () => {
+        const addWorkflow = async () => {
             notify("Converted ComfyUI workflow to ComfyBox format.", { type: "info" })
             workflowState.addWorkflow(this.lCanvas, comfyBoxWorkflow)
             this.lCanvas.deserialize(canvas);
+            await this.refreshComboInNodes(comfyBoxWorkflow);
         }
 
         if (comfyBoxWorkflow.missingNodeTypes.size > 0) {
-            modalState.pushModal({
-                svelteComponent: ConfirmConvertWithMissingNodeTypesModal,
-                svelteProps: {
-                    missingNodeTypes: comfyBoxWorkflow.missingNodeTypes
-                },
-                closeOnClick: false,
-                showCloseButton: false,
-                buttons: [
-                    {
-                        name: "Cancel",
-                        variant: "secondary",
-                        onClick: () => {
-                            layoutStates.remove(comfyBoxWorkflow.id)
+            const f7 = (window as any).f7;
+            if (f7 && f7.dialog) {
+                return new Promise((resolve, reject) => {
+                    const missingList = Array.from(comfyBoxWorkflow.missingNodeTypes).join(', ');
+                    f7.dialog.confirm(
+                        `Workflow has missing node types: ${missingList}. Convert anyway?`,
+                        "Missing Node Types",
+                        async () => {
+                            await addWorkflow();
+                            resolve(comfyBoxWorkflow);
+                        },
+                        () => {
+                            layoutStates.remove(comfyBoxWorkflow.id);
+                            reject(new Error("Workflow conversion cancelled"));
                         }
+                    );
+                });
+            } else {
+                modalState.pushModal({
+                    svelteComponent: ConfirmConvertWithMissingNodeTypesModal,
+                    svelteProps: {
+                        missingNodeTypes: comfyBoxWorkflow.missingNodeTypes
                     },
-                    {
-                        name: "Convert",
-                        variant: "primary",
-                        onClick: addWorkflow
-                    },
-                ]
-            })
+                    closeOnClick: false,
+                    showCloseButton: false,
+                    buttons: [
+                        {
+                            name: "Cancel",
+                            variant: "secondary",
+                            onClick: () => {
+                                layoutStates.remove(comfyBoxWorkflow.id)
+                            }
+                        },
+                        {
+                            name: "Convert",
+                            variant: "primary",
+                            onClick: async () => {
+                                await addWorkflow();
+                            }
+                        },
+                    ]
+                })
+            }
         }
         else {
-            addWorkflow()
+            await addWorkflow()
         }
+        return comfyBoxWorkflow;
+    }
+
+    async loadServerWorkflow(filename: string): Promise<ComfyBoxWorkflow> {
+        const options: RequestInit = get(configState).cacheBuiltInResources ? {} : { cache: "no-store" };
+        const response = await fetch(`/workflows/${filename}`, options);
+        if (!response.ok) {
+            throw new Error(`Failed to load /workflows/${filename}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        let workflow: ComfyBoxWorkflow;
+        if (isComfyBoxWorkflow(data)) {
+            workflow = await this.openWorkflow(data);
+        } else if (isVanillaWorkflow(data)) {
+            workflow = await this.openVanillaWorkflow(data, filename);
+        } else {
+            throw new Error(`Unrecognized workflow format in ${filename}`);
+        }
+        this.saveStateToLocalStorage(false);
+        return workflow;
     }
 
     setActiveWorkflow(id: WorkflowInstID) {
@@ -1063,6 +1105,22 @@ export default class ComfyApp {
                         }
                     }
 
+                    for (const node of workflow.graph.iterateNodesInOrderRecursive()) {
+                        if (node.is(ComfyComboNode)) {
+                            const combo = node as ComfyComboNode;
+                            const val = get(combo.value);
+                            const vals = combo.properties.values;
+                            if (val === "COMBO" || val === "A" || (Array.isArray(vals) && vals.length > 0 && !vals.includes(val))) {
+                                const fallback = (combo.properties.defaultValue && vals.includes(combo.properties.defaultValue))
+                                    ? combo.properties.defaultValue
+                                    : (vals?.[0] || "");
+                                if (fallback) {
+                                    combo.setValue(fallback);
+                                }
+                            }
+                        }
+                    }
+
                     const p = this.graphToPrompt(workflow, tag);
                     const wf = this.serialize(workflow)
                     // console.debug(graphToGraphVis(workflow.graph))
@@ -1120,6 +1178,10 @@ export default class ComfyApp {
                                     uiState.update(s => { s.activeError = errorPromptID; return s })
                                 }
                             })
+                        const f7 = (window as any).f7;
+                        if (f7 && f7.dialog && errorMes) {
+                            f7.dialog.alert(errorMes, "Prompt Validation Failed");
+                        }
                         console.error(graphToGraphVis(workflow.graph))
                         console.error(promptToGraphVis(p))
                         console.error("Error queuing prompt", error, num, p)
@@ -1316,7 +1378,7 @@ export default class ComfyApp {
             for (const [comfyInput, comboNode] of found) {
                 const def = defs[node.type];
 
-                const hasBackendConfig = def["input"]["required"][comfyInput.name] !== undefined
+                const hasBackendConfig = def?.["input"]?.["required"]?.[comfyInput.name] !== undefined || def?.["input"]?.["optional"]?.[comfyInput.name] !== undefined;
 
                 if (hasBackendConfig) {
                     backendUpdatedCombos[comboNode.id] = { comboNode, comfyInput, backendNode: node }
@@ -1359,17 +1421,39 @@ export default class ComfyApp {
         // Load definitions from the backend.
         for (const { comboNode, comfyInput, backendNode } of Object.values(backendUpdatedCombos)) {
             const def = defs[backendNode.type];
-            const [rawValues, opts] = def.input.required[comfyInput.name];
+            const inputDef = def?.input?.required?.[comfyInput.name] || def?.input?.optional?.[comfyInput.name];
+            if (!inputDef) continue;
+
+            let rawValues = inputDef[0];
+            const opts = inputDef[1];
+
+            if (!Array.isArray(rawValues) && opts) {
+                if (Array.isArray((opts as any).options)) {
+                    rawValues = (opts as any).options;
+                } else if (Array.isArray(opts.values)) {
+                    rawValues = opts.values;
+                }
+            }
+
+            if (!Array.isArray(rawValues)) {
+                if (typeof rawValues === "string") {
+                    rawValues = [rawValues];
+                } else if (rawValues && typeof rawValues === "object") {
+                    rawValues = Object.values(rawValues);
+                } else {
+                    rawValues = [];
+                }
+            }
 
             console.debug("[ComfyApp] Reconfiguring combo widget", backendNode.type, "=>", comboNode.type, rawValues.length)
             comboNode.doAutoConfig(comfyInput, { includeProperties: new Set(["values"]), setWidgetTitle: false })
 
             const values = rawValues as string[]
-            const defaultValue = rawValues[0];
+            const defaultValue = (opts && ((opts as any).default || opts.defaultValue)) || rawValues[0] || "";
 
             comboNode.formatValues(values, defaultValue, true)
             if (!rawValues?.includes(get(comboNode.value))) {
-                comboNode.setValue(rawValues[0], comfyInput.config.defaultValue)
+                comboNode.setValue(defaultValue || rawValues[0], comfyInput.config?.defaultValue)
             }
         }
     }

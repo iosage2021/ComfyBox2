@@ -51,7 +51,13 @@ const store: Writable<InterfaceState> = writable(
         isDarkMode: false,
     })
 
-const debounceDrag = debounce(() => { store.update(s => { s.showIndicator = false; return s }) }, 1000)
+let _debounceDrag: ReturnType<typeof debounce> | null = null;
+const debounceDrag = () => {
+    if (!_debounceDrag) {
+        _debounceDrag = debounce(() => { store.update(s => { s.showIndicator = false; return s }) }, 1000);
+    }
+    return _debounceDrag();
+};
 
 function showIndicator(pointerX: number, pointerY: number, value: any) {
     if (!window)
