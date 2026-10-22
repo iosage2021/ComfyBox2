@@ -901,8 +901,7 @@ export default class ComfyApp {
     }
 
     async loadServerWorkflow(filename: string): Promise<ComfyBoxWorkflow> {
-        const options: RequestInit = get(configState).cacheBuiltInResources ? {} : { cache: "no-store" };
-        const response = await fetch(`/workflows/${filename}`, options);
+        const response = await fetch(`/workflows/${filename}?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) {
             throw new Error(`Failed to load /workflows/${filename}: ${response.statusText}`);
         }
@@ -1448,11 +1447,33 @@ export default class ComfyApp {
             console.debug("[ComfyApp] Reconfiguring combo widget", backendNode.type, "=>", comboNode.type, rawValues.length)
             comboNode.doAutoConfig(comfyInput, { includeProperties: new Set(["values"]), setWidgetTitle: false })
 
-            const values = rawValues as string[]
-            const defaultValue = (opts && ((opts as any).default || opts.defaultValue)) || rawValues[0] || "";
+            const isImageUpload = Boolean(
+                (opts as any)?.image_upload ||
+                (comfyInput.config as any)?.image_upload ||
+                comboNode.properties.imageUpload ||
+                backendNode.type === "LoadImage" ||
+                backendNode.type === "LoadImageMask"
+            );
+            if (isImageUpload) {
+                comboNode.properties.imageUpload = true;
+            }
+
+            const curVal = get(comboNode.value);
+            let values = [...(rawValues as string[])];
+            if (isImageUpload && curVal && !values.includes(curVal)) {
+                values.unshift(curVal);
+            }
+
+            const defaultValue = (opts && ((opts as any).default || opts.defaultValue)) || values[0] || "";
 
             comboNode.formatValues(values, defaultValue, true)
-            if (!rawValues?.includes(get(comboNode.value))) {
+            if (isImageUpload) {
+                if (curVal) {
+                    comboNode.setValue(curVal);
+                } else if (values.length > 0) {
+                    comboNode.setValue(values[0]);
+                }
+            } else if (!rawValues?.includes(get(comboNode.value))) {
                 comboNode.setValue(defaultValue || rawValues[0], comfyInput.config?.defaultValue)
             }
         }

@@ -30,8 +30,14 @@
 
  $: isImageUpload = Boolean(
      node?.properties?.imageUpload ||
-     (node?.properties?.values && node.properties.values.some(v => typeof v === 'string' && /\.(png|jpe?g|webp|gif|bmp)$/i.test(v)))
+     (node?.properties?.values && node.properties.values.some(v => typeof v === 'string' && /\.(png|jpe?g|webp|gif|bmp)$/i.test(v))) ||
+     (widget?.attrs?.title && /image|图片|start_image/i.test(widget.attrs.title)) ||
+     (node?.title && /image|图片|LoadImage/i.test(node.title))
  );
+
+ $: if (isImageUpload && $nodeValue && !$valuesForCombo.some(v => v.value === $nodeValue)) {
+     $valuesForCombo = [{ value: $nodeValue, label: $nodeValue, index: 0 }, ...$valuesForCombo];
+ }
 
  async function uploadImageBlob(blob: Blob, originalFilename?: string) {
      isUploading = true;
@@ -367,14 +373,14 @@
             </div>
         {/if}
         <Select
-            value={$valuesForCombo.length === 0 ? "(Loading...)" : $nodeValue}
+            value={$valuesForCombo.length === 0 ? (isImageUpload ? ($nodeValue || "点击 📷上传 或 📋粘贴 图片") : "(Loading...)") : $nodeValue}
             bind:justValue={option}
             bind:hoverItemIndex
             bind:filterText
             bind:listOpen
             bind:input
             items={$valuesForCombo}
-            disabled={$valuesForCombo.length === 0 || isDisabled(widget)}
+            disabled={(!isImageUpload && $valuesForCombo.length === 0) || isDisabled(widget)}
             clearable={false}
             showChevron={true}
             listAutoWidth={true}

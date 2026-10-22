@@ -210,7 +210,17 @@
       "flags": {},
       "order": 5,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "localized_name": "Start Image (起始输入图片)",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        }
+      ],
       "outputs": [
         {
           "name": "IMAGE",

@@ -27,9 +27,10 @@
     async function fetchServerWorkflows() {
         loadingServerWorkflows = true;
         try {
-            let res = await fetch("/api/workflows");
+            const timestamp = Date.now();
+            let res = await fetch(`/api/workflows?t=${timestamp}`, { cache: "no-store" });
             if (!res.ok) {
-                res = await fetch("/workflows/list.json");
+                res = await fetch(`/workflows/list.json?t=${timestamp}`, { cache: "no-store" });
             }
             if (res.ok) {
                 const list = await res.json();
@@ -40,7 +41,7 @@
         } catch (e) {
             console.error("Failed to fetch server workflows:", e);
             try {
-                const res2 = await fetch("/workflows/list.json");
+                const res2 = await fetch(`/workflows/list.json?t=${Date.now()}`, { cache: "no-store" });
                 if (res2.ok) {
                     serverWorkflows = await res2.json();
                 }
@@ -94,7 +95,7 @@
             // Automatically navigate to the newly opened workflow
             const newIndex = $workflowState.openedWorkflows.findIndex(w => w.id === wf.id);
             if (newIndex >= 0) {
-                f7.view.main.router.navigate(`/workflows/${newIndex + 1}/`);
+                f7.view.main.router.navigate(`/workflows/${newIndex + 1}/`, { ignoreCache: true, reloadCurrent: false });
             }
         } catch (err) {
             f7.preloader.hide();
