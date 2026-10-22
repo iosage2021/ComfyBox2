@@ -132,15 +132,21 @@
     "description": "Wan 文生视频 (Text-to-Video)"
   },
   {
+    "filename": "wan2.2_t2v_5b_768x768.json",
+    "name": "wan2.2_t2v_5b_768x768",
+    "category": "Wan Video",
+    "description": "Wan 2.2 5B 文生视频 (Text-to-Video 768p)"
+  },
+  {
     "filename": "wan2.2_i2v_5b_768x768.json",
     "name": "wan2.2_i2v_5b_768x768",
     "category": "Wan Video",
-    "description": "Wan 图生视频 (Image-to-Video)"
+    "description": "Wan 2.2 5B 图生视频 (I2V 768p)"
   },
   {
     "filename": "wan2.2_ti2v_5b_768x768.json",
     "name": "wan2.2_ti2v_5b_768x768",
     "category": "Wan Video",
-    "description": "Wan 图生视频 (Image-to-Video)"
+    "description": "Wan 2.2 5B 图文生视频 (TI2V 768p)"
   }
 ]
