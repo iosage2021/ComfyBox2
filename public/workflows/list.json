@@ -148,5 +148,11 @@
     "name": "wan2.2_ti2v_5b_768x768",
     "category": "Wan Video",
     "description": "Wan 2.2 5B 图文生视频 (TI2V 768p)"
+  },
+  {
+    "filename": "moss_image_8step.json",
+    "name": "moss_image_8step",
+    "category": "MOSS Image",
+    "description": "MOSS-Image 8-Step DMD 极速文生图 (8步极速高清)"
   }
 ]
