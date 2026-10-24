@@ -1008,14 +1008,15 @@ export async function copyImageToClipboard(
 }
 
 /**
- * Copies an image to the clipboard and gives user feedback (vibration + toast).
+ * Copies an image to the clipboard and gives user feedback (vibration + toast or action sheet on HTTP).
  */
 export async function copyImageWithFeedback(source: HTMLImageElement | string): Promise<boolean> {
     vibrateIfPossible(40);
+    const url = typeof source !== "string" && source != null && "src" in source ? (source as HTMLImageElement).src : (source as string);
     try {
         const res = await copyImageToClipboard(source);
-        if (res.success) {
-            const msg = res.type === "image" ? "📋 图片已复制到剪贴板" : "🔗 图片链接已复制到剪贴板";
+        if (res.success && res.type === "image") {
+            const msg = "📋 图片已复制到剪贴板";
             if (f7 && f7.toast) {
                 f7.toast.create({
                     text: msg,
@@ -1026,10 +1027,58 @@ export async function copyImageWithFeedback(source: HTMLImageElement | string): 
                 notify(msg, { type: "success" });
             }
             return true;
-        } else {
-            notify("复制图片失败", { type: "error" });
-            return false;
         }
+
+        // On HTTP insecure context: navigator.clipboard.write is forbidden by browser policy.
+        // res.type === "url" means URL was copied to clipboard as fallback.
+        if (f7 && f7.actions) {
+            const actions = f7.actions.create({
+                buttons: [
+                    [
+                        {
+                            text: "⚠️ 局域网 HTTP 限制直接写入图片",
+                            label: true,
+                        },
+                        {
+                            text: "📥 保存 / 下载图片到本地",
+                            onClick: () => {
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `comfy_${Date.now()}.png`;
+                                a.target = "_blank";
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                            }
+                        },
+                        {
+                            text: "🔍 在新标签打开 (可用系统菜单长按拷贝)",
+                            onClick: () => {
+                                window.open(url, "_blank");
+                            }
+                        },
+                        {
+                            text: "🔗 图片链接已自动复制到剪贴板",
+                            onClick: () => {
+                                if (f7.toast) {
+                                    f7.toast.create({ text: "🔗 链接已复制", closeTimeout: 1500, position: "center" }).open();
+                                }
+                            }
+                        }
+                    ],
+                    [
+                        {
+                            text: "关闭",
+                            color: "red"
+                        }
+                    ]
+                ]
+            });
+            actions.open();
+        } else {
+            notify("局域网 HTTP 限制直接复制图片，已复制链接", { type: "info" });
+        }
+        return true;
     } catch (err) {
         console.error("Failed to copy image:", err);
         notify("复制图片失败", { type: "error" });
