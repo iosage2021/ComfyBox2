@@ -10,6 +10,7 @@
 	import { Image } from "@gradio/icons";
 	import type { FileData } from "@gradio/upload";
 	import { normalise_file } from "@gradio/upload";
+	import { longpress, copyImageWithFeedback } from "$lib/utils";
 
 	export let show_label: boolean = true;
 	export let label: string;
@@ -185,6 +186,8 @@
 			<ModifyUpload on:clear={() => (selected_image = null)} />
 
 			<img
+				use:longpress
+				on:longpress={() => copyImageWithFeedback(imgElem || _value[selected_image][0].data)}
 				on:click={onClick}
                 bind:this={imgElem}
 				src={_value[selected_image][0].data}
@@ -204,14 +207,17 @@
 			{/if}
 			<div bind:this={container} class="thumbnails scroll-hide">
 				{#each _value as image, i}
+					{@const thumbSrc = image[0].data}
 					<button
 						bind:this={el[i]}
+						use:longpress
+						on:longpress={() => copyImageWithFeedback(thumbSrc)}
 						on:click={() => (selected_image = i)}
 						class="thumbnail-item thumbnail-small"
 						class:selected={selected_image === i}
 					>
 						<img
-							src={image[0].data}
+							src={thumbSrc}
 							title={image[1] || null}
 							alt={image[1] || null}
 						/>
@@ -228,14 +234,17 @@
 	>
 		<div class="grid-container" style={styles} class:pt-6={show_label}>
 			{#each _value as [image, caption], i}
+				{@const thumbSrc = typeof image === "string" ? image : image.data}
 				<button
 					class="thumbnail-item thumbnail-lg"
 					class:selected={selected_image === i}
+					use:longpress
+					on:longpress={() => copyImageWithFeedback(thumbSrc)}
 					on:click={() => (selected_image = can_zoom ? i : selected_image)}
 				>
 					<img
 						alt={caption || ""}
-						src={typeof image === "string" ? image : image.data}
+						src={thumbSrc}
 					/>
 					{#if caption}
 						<div class="caption-label">
@@ -278,6 +287,9 @@
 		width: var(--size-full);
 		height: calc(var(--size-full) - 60px);
 		object-fit: contain;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.preview img.with-caption {
@@ -318,6 +330,9 @@
 		width: var(--size-full);
 		height: var(--size-full);
 		overflow: clip;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.thumbnail-item:hover {

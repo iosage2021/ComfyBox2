@@ -10,6 +10,8 @@ import { ImageViewer } from "./ImageViewer";
 import configState from "$lib/stores/configState";
 import SendOutputModal, { type SendOutputModalResult } from "$lib/components/modal/SendOutputModal.svelte";
 import { OutputThumbnailsMode } from "./stores/configDefs";
+import notify from "$lib/notify";
+import { f7 } from "framework7-svelte";
 
 export function clamp(n: number, min: number, max: number): number {
     if (max <= min)
@@ -833,4 +835,353 @@ export function vibrateIfPossible(strength: number | Array<number>) {
   if (window.navigator.vibrate) {
     window.navigator.vibrate(strength);
   }
+}
+
+/**
+ * Convert an image (HTMLImageElement or URL string) to a PNG Blob.
+ */
+export async function imageToPngBlob(source: HTMLImageElement | string): Promise<Blob> {
+    const isImgElem = typeof source !== "string" && source != null && "src" in source;
+    const imgElem = isImgElem ? (source as HTMLImageElement) : null;
+    const url = isImgElem ? (source as HTMLImageElement).src : (source as string);
+
+    // 1. If HTMLImageElement is already rendered and complete, try drawing directly
+    if (imgElem && imgElem.complete && (imgElem.naturalWidth || imgElem.width) > 0) {
+        try {
+            const canvas = document.createElement("canvas");
+            canvas.width = imgElem.naturalWidth || imgElem.width;
+            canvas.height = imgElem.naturalHeight || imgElem.height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+                ctx.drawImage(imgElem, 0, 0);
+                const blob = await new Promise<Blob | null>((resolve) =>
+                    canvas.toBlob(resolve, "image/png")
+                );
+                if (blob) return blob;
+            }
+        } catch (e) {
+            console.warn("Direct image element canvas drawing failed (possible CORS/taint):", e);
+        }
+    }
+
+    // 2. Fetch image as blob
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const blob = await res.blob();
+            if (blob.type === "image/png") {
+                return blob;
+            }
+
+            // Convert to PNG via createImageBitmap if available
+            if (typeof createImageBitmap !== "undefined") {
+                try {
+                    const bitmap = await createImageBitmap(blob);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = bitmap.width;
+                    canvas.height = bitmap.height;
+                    const ctx = canvas.getContext("2d");
+                    if (ctx) {
+                        ctx.drawImage(bitmap, 0, 0);
+                        const pngBlob = await new Promise<Blob | null>((resolve) =>
+                            canvas.toBlob(resolve, "image/png")
+                        );
+                        if (pngBlob) return pngBlob;
+                    }
+                } catch (bmErr) {
+                    console.warn("createImageBitmap failed:", bmErr);
+                }
+            }
+
+            // Convert via blob URL Image element
+            const blobUrl = URL.createObjectURL(blob);
+            try {
+                const pngBlob = await new Promise<Blob>((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement("canvas");
+                        canvas.width = img.naturalWidth || img.width;
+                        canvas.height = img.naturalHeight || img.height;
+                        const ctx = canvas.getContext("2d");
+                        if (!ctx) return reject(new Error("No canvas context"));
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png");
+                    };
+                    img.onerror = () => reject(new Error("Failed to load blob image"));
+                    img.src = blobUrl;
+                });
+                return pngBlob;
+            } finally {
+                URL.revokeObjectURL(blobUrl);
+            }
+        }
+    } catch (fetchErr) {
+        console.warn("Fetch conversion failed, trying Image with crossOrigin:", fetchErr);
+    }
+
+    // 3. Fallback: new Image() with crossOrigin anonymous
+    return new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return reject(new Error("No canvas context"));
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png");
+            } catch (err) {
+                reject(err);
+            }
+        };
+        img.onerror = () => reject(new Error("Image failed to load: " + url));
+        img.src = url;
+    });
+}
+
+/**
+ * Copies an image or image URL to clipboard.
+ * Returns { success: boolean; type: "image" | "url" }
+ */
+export async function copyImageToClipboard(
+    source: HTMLImageElement | string
+): Promise<{ success: boolean; type: "image" | "url" }> {
+    const url = typeof source !== "string" && source != null && "src" in source ? (source as HTMLImageElement).src : (source as string);
+
+    // 1. Try modern navigator.clipboard.write
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.write === "function") {
+        try {
+            const pngPromise = imageToPngBlob(source);
+            let item: ClipboardItem;
+            try {
+                // Pass Promise directly into ClipboardItem (Safari 13.4+, modern Chrome 96+, Edge)
+                // This preserves transient user activation token!
+                item = new ClipboardItem({ "image/png": pngPromise });
+            } catch (ctorErr) {
+                const pngBlob = await pngPromise;
+                item = new ClipboardItem({ "image/png": pngBlob });
+            }
+
+            await navigator.clipboard.write([item]);
+            return { success: true, type: "image" };
+        } catch (err) {
+            console.warn("navigator.clipboard.write failed:", err);
+        }
+    }
+
+    // 2. Fallback: navigator.clipboard.writeText
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        try {
+            await navigator.clipboard.writeText(url);
+            return { success: true, type: "url" };
+        } catch (err) {
+            console.warn("navigator.clipboard.writeText failed:", err);
+        }
+    }
+
+    // 3. Fallback: execCommand copy for insecure HTTP contexts
+    if (typeof document !== "undefined") {
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = url;
+            ta.style.position = "fixed";
+            ta.style.top = "0";
+            ta.style.left = "0";
+            ta.style.opacity = "0";
+            ta.style.pointerEvents = "none";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            const ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            if (ok) {
+                return { success: true, type: "url" };
+            }
+        } catch (err) {
+            console.error("execCommand copy fallback failed:", err);
+        }
+    }
+
+    return { success: false, type: "image" };
+}
+
+/**
+ * Copies an image to the clipboard and gives user feedback (vibration + toast).
+ */
+export async function copyImageWithFeedback(source: HTMLImageElement | string): Promise<boolean> {
+    vibrateIfPossible(40);
+    try {
+        const res = await copyImageToClipboard(source);
+        if (res.success) {
+            const msg = res.type === "image" ? "📋 图片已复制到剪贴板" : "🔗 图片链接已复制到剪贴板";
+            if (f7 && f7.toast) {
+                f7.toast.create({
+                    text: msg,
+                    closeTimeout: 2000,
+                    position: "center",
+                }).open();
+            } else {
+                notify(msg, { type: "success" });
+            }
+            return true;
+        } else {
+            notify("复制图片失败", { type: "error" });
+            return false;
+        }
+    } catch (err) {
+        console.error("Failed to copy image:", err);
+        notify("复制图片失败", { type: "error" });
+        return false;
+    }
+}
+
+export interface LongPressOptions {
+    duration?: number;
+    threshold?: number;
+    onLongPress?: (e: { target: HTMLElement; x: number; y: number }) => void;
+}
+
+/**
+ * Svelte action for long-press gesture (touch and mouse hold).
+ * Cancels on movement exceeding threshold.
+ * Dispatches 'longpress' custom event and prevents click trigger on release.
+ */
+export function longpress(node: HTMLElement, options: LongPressOptions | number = {}) {
+    let duration = typeof options === "number" ? options : (options.duration ?? 450);
+    let threshold = typeof options === "number" ? 10 : (options.threshold ?? 10);
+    let callback = typeof options === "object" ? options.onLongPress : undefined;
+
+    let timer: any = null;
+    let startX = 0;
+    let startY = 0;
+    let triggered = false;
+    let suppressClick = false;
+
+    function start(x: number, y: number) {
+        startX = x;
+        startY = y;
+        triggered = false;
+        suppressClick = false;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            triggered = true;
+            suppressClick = true;
+            const detail = { target: node, x: startX, y: startY };
+            node.dispatchEvent(new CustomEvent("longpress", { detail }));
+            if (callback) {
+                callback(detail);
+            }
+        }, duration);
+    }
+
+    function cancel() {
+        clearTimeout(timer);
+        timer = null;
+    }
+
+    function handleTouchStart(e: TouchEvent) {
+        if (e.touches.length !== 1) {
+            cancel();
+            return;
+        }
+        start(e.touches[0].clientX, e.touches[0].clientY);
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+        if (!timer) return;
+        const touch = e.touches[0];
+        const dist = Math.hypot(touch.clientX - startX, touch.clientY - startY);
+        if (dist > threshold) {
+            cancel();
+        }
+    }
+
+    function handleTouchEnd(e: TouchEvent) {
+        cancel();
+        if (triggered) {
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+            setTimeout(() => {
+                suppressClick = false;
+                triggered = false;
+            }, 300);
+        }
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+        if (e.button !== 0) return;
+        start(e.clientX, e.clientY);
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+        if (!timer) return;
+        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+        if (dist > threshold) {
+            cancel();
+        }
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+        cancel();
+        if (triggered) {
+            setTimeout(() => {
+                suppressClick = false;
+                triggered = false;
+            }, 300);
+        }
+    }
+
+    function handleClick(e: MouseEvent) {
+        if (suppressClick || triggered) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            suppressClick = false;
+            triggered = false;
+        }
+    }
+
+    function handleContextMenu(e: MouseEvent) {
+        if (triggered) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+
+    node.addEventListener("touchstart", handleTouchStart, { passive: true });
+    node.addEventListener("touchmove", handleTouchMove, { passive: true });
+    node.addEventListener("touchend", handleTouchEnd);
+    node.addEventListener("touchcancel", cancel);
+
+    node.addEventListener("mousedown", handleMouseDown);
+    node.addEventListener("mousemove", handleMouseMove);
+    node.addEventListener("mouseup", handleMouseUp);
+
+    node.addEventListener("contextmenu", handleContextMenu);
+    node.addEventListener("click", handleClick, true);
+
+    return {
+        update(newOptions: LongPressOptions | number) {
+            duration = typeof newOptions === "number" ? newOptions : (newOptions.duration ?? 450);
+            threshold = typeof newOptions === "number" ? 10 : (newOptions.threshold ?? 10);
+            callback = typeof newOptions === "object" ? newOptions.onLongPress : undefined;
+        },
+        destroy() {
+            cancel();
+            node.removeEventListener("touchstart", handleTouchStart);
+            node.removeEventListener("touchmove", handleTouchMove);
+            node.removeEventListener("touchend", handleTouchEnd);
+            node.removeEventListener("touchcancel", cancel);
+
+            node.removeEventListener("mousedown", handleMouseDown);
+            node.removeEventListener("mousemove", handleMouseMove);
+            node.removeEventListener("mouseup", handleMouseUp);
+
+            node.removeEventListener("contextmenu", handleContextMenu);
+            node.removeEventListener("click", handleClick, true);
+        }
+    };
 }

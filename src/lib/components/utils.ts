@@ -5,6 +5,7 @@ import { get } from "svelte/store";
 import { PhotoBrowser, f7 } from "framework7-svelte";
 import { ImageViewer } from "$lib/ImageViewer";
 import interfaceState from "$lib/stores/interfaceState";
+import { longpress, copyImageWithFeedback } from "$lib/utils";
 
 export function handleContainerConsider(layoutState: WritableLayoutStateStore, container: ContainerLayout, evt: CustomEvent<DndEvent<IDragItem>>): IDragItem[] {
     return layoutState.updateChildren(container, evt.detail.items)
@@ -66,7 +67,25 @@ export function showMobileLightbox(images: any[], selectedImage: number, options
         photos: images,
         theme: get(interfaceState).isDarkMode ? "dark" : "light",
         type: 'popup',
-        ...options
+        ...options,
+        on: {
+            ...options.on,
+            open(pb: any) {
+                if (options.on?.open) options.on.open(pb);
+                if (pb.el) {
+                    longpress(pb.el, {
+                        onLongPress() {
+                            const activeIndex = pb.activeIndex || 0;
+                            const photo = pb.params.photos[activeIndex];
+                            const url = typeof photo === "string" ? photo : (photo?.url || photo?.src);
+                            if (url) {
+                                copyImageWithFeedback(url);
+                            }
+                        }
+                    });
+                }
+            }
+        }
     });
     mobileLightbox.open(selectedImage)
 }

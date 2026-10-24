@@ -2,7 +2,7 @@
  import { Page, Navbar, Block, Tabs, Tab, NavLeft, NavTitle, NavRight, Link, f7 } from "framework7-svelte"
  import type ComfyApp from "$lib/components/ComfyApp";
  import interfaceState from "$lib/stores/interfaceState";
- import { convertComfyOutputToComfyURL, partition, showLightbox } from "$lib/utils";
+ import { convertComfyOutputToComfyURL, partition, showLightbox, longpress, copyImageWithFeedback } from "$lib/utils";
  import uiQueueState, { type QueueUIEntry } from "$lib/stores/uiQueueState";
  import { showMobileLightbox } from "$lib/components/utils";
  import notify from "$lib/notify";
@@ -38,6 +38,11 @@
      showMobileLightbox(allImages, index)
  }
 
+ function handleLongPress(image: string, target?: HTMLElement) {
+     const imgElem = target instanceof HTMLImageElement ? target : undefined;
+     copyImageWithFeedback(imgElem || image);
+ }
+
  async function clearHistory() {
      f7.dialog.confirm("Are you sure you want to clear the current history?", async () => {
          await app.clearQueue("history");
@@ -64,6 +69,8 @@
                     <div class="grid-entry">
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <img class="grid-entry-image"
+                             use:longpress
+                             on:longpress={(e) => handleLongPress(image, e.detail.target)}
                              on:click={(e) => handleClick(e, entry, index)}
                         src={image}
                         loading="lazy"
@@ -105,10 +112,17 @@
      aspect-ratio: 1 / 1;
      object-fit: cover;
      margin-bottom: var(--f7-grid-gap);
+     -webkit-touch-callout: none;
+     -webkit-user-select: none;
+     user-select: none;
 
      &:hover {
          cursor: pointer;
          filter: brightness(120%) contrast(120%);
+     }
+
+     &:active {
+         opacity: 0.85;
      }
  }
 </style>
