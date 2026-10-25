@@ -252,7 +252,17 @@
       "flags": {},
       "order": 5,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "localized_name": "Input Image (待编辑原图 / 参考图)",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        }
+      ],
       "outputs": [
         {
           "name": "IMAGE",
@@ -308,10 +318,38 @@
           "link": 6
         },
         {
+          "localized_name": "images.image_0",
           "name": "images.image_0",
           "type": "IMAGE",
           "shape": 7,
           "link": 7
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "edit_format",
+          "name": "edit_format",
+          "type": "COMBO",
+          "widget": {
+            "name": "edit_format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image_strength",
+          "name": "image_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "image_strength"
+          },
+          "link": null
         }
       ],
       "outputs": [
