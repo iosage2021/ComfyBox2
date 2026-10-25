@@ -154,5 +154,11 @@
     "name": "moss_image_8step",
     "category": "MOSS Image",
     "description": "MOSS-Image 8-Step DMD 极速文生图 (8步极速高清)"
+  },
+  {
+    "filename": "moss_image_8step_edit.json",
+    "name": "moss_image_8step_edit",
+    "category": "MOSS Image",
+    "description": "MOSS-Image 8-Step 图像编辑 (8步极速指令修图 / Image Edit)"
   }
 ]
