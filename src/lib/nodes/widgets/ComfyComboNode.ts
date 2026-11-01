@@ -5,6 +5,7 @@ import { get, writable, type Writable } from "svelte/store";
 import ComboWidget from "$lib/widgets/ComboWidget.svelte";
 import type { ComfyWidgetProperties } from "./ComfyWidgetNode";
 import ComfyWidgetNode from "./ComfyWidgetNode";
+import { sortImageValues } from "$lib/utils";
 
 
 export interface ComfyComboProperties extends ComfyWidgetProperties {
@@ -70,6 +71,10 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
             } else {
                 values = [];
             }
+        }
+
+        if (this.properties.imageUpload && Array.isArray(values)) {
+            values = sortImageValues(values);
         }
 
         let changed = this.properties.values != values;

@@ -736,6 +736,35 @@ export function playSound(sound: string) {
     audio.play();
 }
 
+export function getImageFileTime(name: string): number {
+    if (typeof name !== 'string') return 0;
+    const m1 = name.match(/paste_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+    if (m1) {
+        return new Date(+m1[1], +m1[2] - 1, +m1[3], +m1[4], +m1[5], +m1[6]).getTime();
+    }
+    const m2 = name.match(/paste_(\d{13})/);
+    if (m2) {
+        return +m2[1];
+    }
+    return 0;
+}
+
+export function sortImageValues(list: any[]): any[] {
+    if (!Array.isArray(list)) return [];
+    const values = [...list];
+    values.sort((a, b) => {
+        const valA = typeof a === 'object' && a !== null ? (a.value || a.label || '') : String(a);
+        const valB = typeof b === 'object' && b !== null ? (b.value || b.label || '') : String(b);
+        const ta = getImageFileTime(valA);
+        const tb = getImageFileTime(valB);
+        if (ta && tb) return tb - ta;
+        if (ta && !tb) return -1;
+        if (!ta && tb) return 1;
+        return valA.localeCompare(valB, undefined, { numeric: true });
+    });
+    return values;
+}
+
 export interface ComfyBatchUploadResult {
     error?: string;
     files: Array<ComfyImageLocation>;

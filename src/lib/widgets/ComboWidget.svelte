@@ -8,7 +8,7 @@
  import { type WidgetLayout } from "$lib/stores/layoutStates";
  import { get, writable, type Writable } from "svelte/store";
  import { isDisabled } from "./utils"
- import { clamp, getSafetensorsMetadata, vibrateIfPossible, batchUploadBlobsToComfyUI } from '$lib/utils';
+ import { clamp, getSafetensorsMetadata, vibrateIfPossible, batchUploadBlobsToComfyUI, sortImageValues } from '$lib/utils';
  import configState from '$lib/stores/configState';
  import notify from '$lib/notify';
  export let widget: WidgetLayout | null = null;
@@ -36,14 +36,29 @@
  );
 
  $: if (isImageUpload && $nodeValue && !$valuesForCombo.some(v => v.value === $nodeValue)) {
-     $valuesForCombo = [{ value: $nodeValue, label: $nodeValue, index: 0 }, ...$valuesForCombo];
+     const remaining = $valuesForCombo.filter(v => v.value !== $nodeValue);
+     const updated = [{ value: $nodeValue, label: $nodeValue }, ...remaining];
+     $valuesForCombo = updated.map((item, idx) => ({ ...item, index: idx }));
+ }
+
+ function formatTimestamp(): string {
+     const d = new Date();
+     const pad = (n: number) => String(n).padStart(2, '0');
+     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+ }
+
+ function getPasteFilename(ext = 'png'): string {
+     return `paste_${formatTimestamp()}.${ext}`;
  }
 
  async function uploadImageBlob(blob: Blob, originalFilename?: string) {
      isUploading = true;
      try {
          const ext = blob.type.split("/")[1]?.replace("+xml", "") || "png";
-         const filename = originalFilename || `paste_${Date.now()}.${ext}`;
+         let filename = originalFilename;
+         if (!filename || /^(image|blob|clipboard|paste)\.(png|jpe?g|webp|gif|bmp)$/i.test(filename)) {
+             filename = getPasteFilename(ext);
+         }
          const res = await batchUploadBlobsToComfyUI([{
              blob,
              filename,
@@ -51,16 +66,21 @@
          }]);
          if (res.files && res.files.length > 0) {
              const uploadedName = res.files[0].filename;
-             if (!$valuesForCombo.some(v => v.value === uploadedName)) {
-                 $valuesForCombo = [{ value: uploadedName, label: uploadedName, index: $valuesForCombo.length }, ...$valuesForCombo];
-             }
-             $nodeValue = uploadedName;
+
              if (node) {
+                 const currentList = Array.isArray(node.properties.values) ? node.properties.values : [];
+                 node.properties.values = [uploadedName, ...currentList.filter(v => v !== uploadedName)];
                  node.setValue(uploadedName);
-                 if (!node.properties.values.includes(uploadedName)) {
-                     node.properties.values.unshift(uploadedName);
+                 if (typeof node.formatValues === 'function') {
+                     node.formatValues(node.properties.values, uploadedName, true);
                  }
              }
+
+             const remaining = $valuesForCombo.filter(v => v.value !== uploadedName);
+             const updated = [{ value: uploadedName, label: uploadedName }, ...remaining];
+             $valuesForCombo = updated.map((item, idx) => ({ ...item, index: idx }));
+             $nodeValue = uploadedName;
+             activeIndex = 0;
              notify(`图片已载入: ${uploadedName}`, { type: "info" });
          } else if (res.errors && res.errors.length > 0) {
              notify(`上传失败: ${res.errors.join(', ')}`, { type: "error" });
@@ -94,8 +114,8 @@
                  const imageType = item.types.find(t => t.startsWith("image/"));
                  if (imageType) {
                      const blob = await item.getType(imageType);
-                     const ext = imageType.split("/")[1] || "png";
-                     const filename = `paste_${Date.now()}.${ext}`;
+                     const ext = imageType.split("/")[1]?.replace("+xml", "") || "png";
+                     const filename = getPasteFilename(ext);
                      await uploadImageBlob(blob, filename);
                      return;
                  }
@@ -130,8 +150,8 @@
                  if (file) {
                      e.preventDefault();
                      e.stopPropagation();
-                     const ext = file.type.split("/")[1] || "png";
-                     const filename = `paste_${Date.now()}.${ext}`;
+                     const ext = file.type.split("/")[1]?.replace("+xml", "") || "png";
+                     const filename = getPasteFilename(ext);
                      showPasteBox = false;
                      uploadImageBlob(file, filename);
                      foundImage = true;
@@ -148,7 +168,9 @@
                  e.preventDefault();
                  e.stopPropagation();
                  showPasteBox = false;
-                 uploadImageBlob(file, file.name);
+                 const ext = file.type.split("/")[1]?.replace("+xml", "") || "png";
+                 const filename = getPasteFilename(ext);
+                 uploadImageBlob(file, filename);
                  foundImage = true;
                  break;
              }
@@ -233,18 +255,31 @@
      hoverItemIndex = index;
  }
 
- function handleSelect(index: number) {
-     // console.warn("SEL", index)
-     vibrateIfPossible(20)
-     const item = $valuesForCombo[index]
-     activeIndex = index;
-     $nodeValue = item.value
+ function handleSelectItem(itemOrIndex: any) {
+     if (itemOrIndex == null) return;
+     vibrateIfPossible(20);
+     let val: string;
+     if (typeof itemOrIndex === 'object' && itemOrIndex !== null) {
+         val = itemOrIndex.value !== undefined ? itemOrIndex.value : itemOrIndex.label;
+     } else if (typeof itemOrIndex === 'number') {
+         const item = $valuesForCombo[itemOrIndex];
+         val = item ? item.value : String(itemOrIndex);
+     } else {
+         val = String(itemOrIndex);
+     }
+     $nodeValue = val;
+     if (node) {
+         node.setValue(val);
+     }
+     activeIndex = $valuesForCombo.findIndex(v => v.value === val);
      listOpen = false;
-     filterText = ""
+     filterText = "";
      setTimeout(() => {
          input?.blur();
-     }, 100)
+     }, 100);
  }
+
+ const handleSelect = handleSelectItem;
 
  function onFilter() {
      // if (scrollToIndex)
@@ -388,7 +423,7 @@
             on:change
             on:focus={onFocus}
             on:hoverItem={(e) => handleHover(e.detail)}
-            on:select={(e) => handleSelect(e.detail.index)}
+            on:select={(e) => handleSelectItem(e.detail)}
             on:blur
             on:filter={onFilter}>
             <div class="comfy-select-list" slot="list"
@@ -396,8 +431,8 @@
                  let:filteredItems
                  style:--maxLabelWidth={node.maxLabelWidthChars || 100}>
                 {#if filteredItems.length > 0}
-                    {@const itemSize = isMobile ? 50 : 25}
-                    {@const itemsToShow = isMobile ? 10 : 30}
+                    {@const itemSize = isMobile ? (isImageUpload ? 54 : 50) : (isImageUpload ? 46 : 25)}
+                    {@const itemsToShow = isMobile ? 8 : 25}
                     <VirtualList
                         items={filteredItems}
                         width="100%"
@@ -409,16 +444,26 @@
                         <div slot="item"
                                 class="comfy-select-item"
                                 class:mobile={isMobile}
+                                class:image-item={isImageUpload}
                                 let:index={i}
                                 let:style
                                 title={getTitle(filteredItems[i].label)}
                                 {style}
-                                class:active={activeIndex === filteredItems[i].index}
+                                class:active={$nodeValue === filteredItems[i].value}
                                 class:hover={hoverItemIndex === i}
-                                on:click={() => handleSelect(filteredItems[i].index)}
+                                on:click={() => handleSelectItem(filteredItems[i])}
                             on:focus={() => handleHover(i)}
                             on:mouseover={() => handleHover(i)}>
                             {@const item = filteredItems[i]}
+                            {#if isImageUpload}
+                                <img 
+                                    class="combo-item-thumb" 
+                                    src="{configState.getBackendURL()}/view?filename={encodeURIComponent(item.value)}&type=input" 
+                                    alt="" 
+                                    loading="lazy" 
+                                    on:error={(e) => { const el = e.currentTarget; if (el instanceof HTMLElement) el.style.display = 'none'; }}
+                                />
+                            {/if}
                             <span class="comfy-select-label">
                                 {item.label}
                             </span>
@@ -438,6 +483,7 @@
                     alt={$nodeValue} 
                     on:error={(e) => { const el = e.currentTarget; if (el instanceof HTMLElement) el.style.display = 'none'; }} 
                 />
+                <div class="combo-image-name" title={$nodeValue}>{$nodeValue}</div>
             </div>
         {/if}
     </label>
@@ -531,8 +577,9 @@
      border-radius: 6px;
      overflow: hidden;
      border: 1px solid rgba(128, 128, 128, 0.2);
-     max-height: 180px;
+     max-height: 220px;
      display: flex;
+     flex-direction: column;
      align-items: center;
      justify-content: center;
      background: rgba(0, 0, 0, 0.05);
@@ -548,6 +595,18 @@
          max-height: 180px;
          object-fit: contain;
          display: block;
+     }
+
+     .combo-image-name {
+         padding: 3px 8px;
+         font-size: 11px;
+         color: var(--f7-text-color-secondary, #999);
+         text-align: center;
+         background: rgba(0, 0, 0, 0.35);
+         width: 100%;
+         overflow: hidden;
+         text-overflow: ellipsis;
+         white-space: nowrap;
      }
  }
 
@@ -665,6 +724,29 @@
          padding: 0.2rem;
 
          .comfy-select-label {
+             overflow: hidden;
+             text-overflow: ellipsis;
+             white-space: nowrap;
+         }
+
+         &.image-item {
+             gap: 8px;
+             padding: 4px 8px;
+
+             &.mobile {
+                 padding: 6px 10px;
+             }
+         }
+
+         .combo-item-thumb {
+             width: 36px;
+             height: 36px;
+             object-fit: cover;
+             border-radius: 4px;
+             border: 1px solid rgba(128, 128, 128, 0.3);
+             background: rgba(0, 0, 0, 0.15);
+             flex-shrink: 0;
+             display: inline-block;
          }
 
          &.mobile {
