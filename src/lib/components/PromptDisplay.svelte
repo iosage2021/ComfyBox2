@@ -18,6 +18,7 @@
 
  export let prompt: SerializedPromptInputsAll;
  export let images: ComfyImageLocation[] = [];
+ export let audios: ComfyImageLocation[] = [];
  export let isMobile: boolean = false;
  export let expandAll: boolean = false;
  export let closeModal: () => void;
@@ -192,6 +193,39 @@
             </Block>
         {/if}
     </div>
+    {#if audios.length > 0}
+        <div class="audio-container">
+            <Block>
+                <div class="prompt-audio-list">
+                    {#each audios as audio}
+                        <div class="prompt-audio-card">
+                            <div class="prompt-audio-header">
+                                <span class="prompt-audio-title">🎵 {audio.filename}</span>
+                                <a
+                                    class="prompt-audio-dl"
+                                    href={convertComfyOutputToComfyURL(audio)}
+                                    download={audio.filename}
+                                    target="_blank"
+                                    rel="noopener"
+                                    title="Download audio"
+                                >
+                                    ⬇️
+                                </a>
+                            </div>
+                            <audio
+                                controls
+                                preload="metadata"
+                                src={convertComfyOutputToComfyURL(audio)}
+                                class="prompt-native-audio"
+                            >
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    {/each}
+                </div>
+            </Block>
+        </div>
+    {/if}
     {#if images.length > 0}
         <div class="image-container">
             <Block>
@@ -303,5 +337,56 @@
              max-height: none !important;
          }
      }
+ }
+
+ .audio-container {
+     position: relative;
+     flex: 1 1 0%;
+     width: 50%;
+ }
+
+ .prompt-audio-list {
+     display: flex;
+     flex-direction: column;
+     gap: 12px;
+     padding: 8px;
+ }
+
+ .prompt-audio-card {
+     display: flex;
+     flex-direction: column;
+     gap: 6px;
+     padding: 10px;
+     background: rgba(0, 0, 0, 0.05);
+     border: 1px solid rgba(128, 128, 128, 0.2);
+     border-radius: 8px;
+ }
+
+ .prompt-audio-header {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     gap: 8px;
+ }
+
+ .prompt-audio-title {
+     font-size: 13px;
+     font-weight: 500;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     white-space: nowrap;
+ }
+
+ .prompt-audio-dl {
+     text-decoration: none;
+     font-size: 13px;
+     padding: 2px 6px;
+     border-radius: 4px;
+     background: rgba(128, 128, 128, 0.15);
+ }
+
+ .prompt-native-audio {
+     width: 100%;
+     height: 38px;
  }
 </style>

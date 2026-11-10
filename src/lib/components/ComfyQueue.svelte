@@ -111,18 +111,21 @@
  let expandAll = false;
  let selectedPrompt = null;
  let selectedImages: ComfyImageLocation[] = [];
+ let selectedAudios: ComfyImageLocation[] = [];
  function showPrompt(entry: QueueUIEntry) {
      if (entry.error != null) {
          showModal = false;
          expandAll = false;
          selectedPrompt = null;
          selectedImages = [];
+         selectedAudios = [];
 
          showError(entry.entry.promptID);
      }
      else {
          selectedPrompt = entry.entry.prompt;
          selectedImages = entry.images;
+         selectedAudios = entry.audios || [];
          showModal = true;
          expandAll = false
      }
@@ -131,6 +134,7 @@
  function closeModal() {
      selectedPrompt = null
      selectedImages = []
+     selectedAudios = []
      showModal = false;
      expandAll = false;
      console.warn("CLOSEMODAL")
@@ -150,7 +154,7 @@
     </div>
     <svelte:fragment let:closeDialog>
         {#if selectedPrompt}
-            <PromptDisplay closeModal={() => { closeModal(); closeDialog(); }} {app} prompt={selectedPrompt} images={selectedImages} {expandAll} />
+            <PromptDisplay closeModal={() => { closeModal(); closeDialog(); }} {app} prompt={selectedPrompt} images={selectedImages} audios={selectedAudios} {expandAll} />
         {/if}
     </svelte:fragment>
     <div slot="buttons" let:closeDialog>

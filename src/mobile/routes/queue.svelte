@@ -95,6 +95,23 @@
                         </CardHeader>
                         <CardContent>
                             <p class="list-entry-message">{entry.submessage}</p>
+                            {#if entry.audios && entry.audios.length > 0}
+                                <div class="queue-audio-container">
+                                    {#each entry.audios as audio}
+                                        <div class="queue-audio-row">
+                                            <span class="queue-audio-name" title={audio.filename}>🎵 {audio.filename}</span>
+                                            <audio
+                                                class="queue-native-audio"
+                                                controls
+                                                preload="metadata"
+                                                src={convertComfyOutputToComfyURL(audio)}
+                                            >
+                                                Your browser does not support the audio element.
+                                            </audio>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
                             <p>
                                 {prompt}
                             </p>
@@ -136,6 +153,36 @@
      align-items: center;
      aspect-ratio: 1 / 1;
      object-fit: cover;
+ }
+
+ .queue-audio-container {
+     margin: 8px 0;
+     display: flex;
+     flex-direction: column;
+     gap: 8px;
+ }
+
+ .queue-audio-row {
+     display: flex;
+     flex-direction: column;
+     gap: 4px;
+     background: rgba(0, 0, 0, 0.04);
+     border: 1px solid rgba(128, 128, 128, 0.2);
+     border-radius: 6px;
+     padding: 6px 8px;
+ }
+
+ .queue-audio-name {
+     font-size: 12px;
+     font-weight: 500;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     white-space: nowrap;
+ }
+
+ .queue-native-audio {
+     width: 100%;
+     height: 36px;
  }
 
  .grid-entry-image {

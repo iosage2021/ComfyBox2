@@ -35,7 +35,20 @@
      (node?.title && /image|图片|LoadImage/i.test(node.title))
  );
 
+ $: isAudioUpload = Boolean(
+     (node?.properties as any)?.audioUpload ||
+     (node?.properties?.values && node.properties.values.some(v => typeof v === 'string' && /\.(wav|mp3|flac|ogg|m4a|aac)$/i.test(v))) ||
+     (widget?.attrs?.title && /audio|音频|sound|voice/i.test(widget.attrs.title)) ||
+     (node?.title && /audio|音频|LoadAudio|voice/i.test(node.title))
+ );
+
  $: if (isImageUpload && $nodeValue && !$valuesForCombo.some(v => v.value === $nodeValue)) {
+     const remaining = $valuesForCombo.filter(v => v.value !== $nodeValue);
+     const updated = [{ value: $nodeValue, label: $nodeValue }, ...remaining];
+     $valuesForCombo = updated.map((item, idx) => ({ ...item, index: idx }));
+ }
+
+ $: if (isAudioUpload && $nodeValue && !$valuesForCombo.some(v => v.value === $nodeValue)) {
      const remaining = $valuesForCombo.filter(v => v.value !== $nodeValue);
      const updated = [{ value: $nodeValue, label: $nodeValue }, ...remaining];
      $valuesForCombo = updated.map((item, idx) => ({ ...item, index: idx }));
@@ -190,6 +203,58 @@
                  break;
              }
          }
+     }
+ }
+
+ let audioFileInput: HTMLInputElement | null = null;
+
+ function triggerAudioFileInput() {
+     vibrateIfPossible(15);
+     audioFileInput?.click();
+ }
+
+ async function onAudioFileSelected(e: Event) {
+     const input = e.target as HTMLInputElement;
+     const file = input?.files?.[0];
+     if (!file) return;
+     await uploadAudioBlob(file, file.name);
+     input.value = "";
+ }
+
+ async function uploadAudioBlob(blob: Blob, originalFilename?: string) {
+     isUploading = true;
+     try {
+         const ext = originalFilename ? originalFilename.split(".").pop() : (blob.type.split("/")[1] || "wav");
+         const filename = originalFilename || `audio_${formatTimestamp()}.${ext}`;
+         const res = await batchUploadBlobsToComfyUI([{
+             blob,
+             filename,
+             overwrite: true
+         }]);
+         if (res.files && res.files.length > 0) {
+             const uploadedName = res.files[0].filename;
+
+             if (node) {
+                 const cur = node.properties.values || [];
+                 if (!cur.includes(uploadedName)) {
+                     node.properties.values = [uploadedName, ...cur];
+                 }
+             }
+
+             if (!$valuesForCombo.some(v => v.value === uploadedName)) {
+                 const updated = [{ value: uploadedName, label: uploadedName }, ...$valuesForCombo];
+                 $valuesForCombo = updated.map((item, idx) => ({ ...item, index: idx }));
+             }
+
+             $nodeValue = uploadedName;
+             vibrateIfPossible([30, 50, 30]);
+             notify.success(`音频已上传: ${uploadedName}`);
+         }
+     } catch (err: any) {
+         console.error("Audio upload error:", err);
+         notify.error("上传音频失败: " + err);
+     } finally {
+         isUploading = false;
      }
  }
 
@@ -393,6 +458,27 @@
                     on:change={onFileSelected} 
                 />
             </div>
+        {:else if isAudioUpload}
+            <div class="combo-header" style="justify-content: flex-end;">
+                <div class="combo-actions">
+                    <button 
+                        type="button" 
+                        class="combo-btn upload-btn" 
+                        disabled={isUploading}
+                        title="选择本地音频文件上传"
+                        on:click|preventDefault|stopPropagation={triggerAudioFileInput}
+                    >
+                        {isUploading ? "上传中..." : "🎵 上传音频"}
+                    </button>
+                </div>
+                <input 
+                    type="file" 
+                    accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" 
+                    bind:this={audioFileInput} 
+                    style="display: none;" 
+                    on:change={onAudioFileSelected} 
+                />
+            </div>
         {/if}
         {#if isImageUpload && showPasteBox}
             <div class="paste-box-container">
@@ -408,14 +494,14 @@
             </div>
         {/if}
         <Select
-            value={$valuesForCombo.length === 0 ? (isImageUpload ? ($nodeValue || "点击 📷上传 或 📋粘贴 图片") : "(Loading...)") : $nodeValue}
+            value={$valuesForCombo.length === 0 ? (isImageUpload ? ($nodeValue || "点击 📷上传 或 📋粘贴 图片") : (isAudioUpload ? ($nodeValue || "点击 🎵上传音频") : "(Loading...)")) : $nodeValue}
             bind:justValue={option}
             bind:hoverItemIndex
             bind:filterText
             bind:listOpen
             bind:input
             items={$valuesForCombo}
-            disabled={(!isImageUpload && $valuesForCombo.length === 0) || isDisabled(widget)}
+            disabled={(!isImageUpload && !isAudioUpload && $valuesForCombo.length === 0) || isDisabled(widget)}
             clearable={false}
             showChevron={true}
             listAutoWidth={true}
@@ -484,6 +570,19 @@
                     on:error={(e) => { const el = e.currentTarget; if (el instanceof HTMLElement) el.style.display = 'none'; }} 
                 />
                 <div class="combo-image-name" title={$nodeValue}>{$nodeValue}</div>
+            </div>
+        {/if}
+        {#if isAudioUpload && $nodeValue && !['', '(Loading...)', 'None', '(No items)'].includes($nodeValue)}
+            <div class="combo-audio-preview">
+                <audio 
+                    class="combo-native-audio" 
+                    controls 
+                    preload="metadata" 
+                    src="{configState.getBackendURL()}/view?filename={encodeURIComponent($nodeValue)}&type=input"
+                >
+                    Your browser does not support the audio element.
+                </audio>
+                <div class="combo-audio-name" title={$nodeValue}>🎵 {$nodeValue}</div>
             </div>
         {/if}
     </label>
@@ -604,6 +703,31 @@
          text-align: center;
          background: rgba(0, 0, 0, 0.35);
          width: 100%;
+         overflow: hidden;
+         text-overflow: ellipsis;
+         white-space: nowrap;
+     }
+ }
+
+ .combo-audio-preview {
+     margin-top: 6px;
+     border-radius: 6px;
+     border: 1px solid rgba(128, 128, 128, 0.2);
+     background: rgba(0, 0, 0, 0.05);
+     padding: 8px 10px;
+     display: flex;
+     flex-direction: column;
+     gap: 6px;
+
+     .combo-native-audio {
+         width: 100%;
+         height: 36px;
+         outline: none;
+     }
+
+     .combo-audio-name {
+         font-size: 11px;
+         color: var(--f7-text-color-secondary, #999);
          overflow: hidden;
          text-overflow: ellipsis;
          white-space: nowrap;

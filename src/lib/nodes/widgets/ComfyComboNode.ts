@@ -11,6 +11,7 @@ import { sortImageValues } from "$lib/utils";
 export interface ComfyComboProperties extends ComfyWidgetProperties {
     values: string[]
     imageUpload?: boolean
+    audioUpload?: boolean
 
     /* JS Function body that takes a parameter named "value" as a parameter and returns the label for each combo entry */
     convertValueToLabelCode: string
@@ -22,7 +23,8 @@ export default class ComfyComboNode extends ComfyWidgetNode<string> {
         defaultValue: "A",
         values: ["A", "B", "C", "D"],
         convertValueToLabelCode: "",
-        imageUpload: false
+        imageUpload: false,
+        audioUpload: false
     }
 
     static slotLayout: SlotLayout = {

@@ -230,6 +230,9 @@ function configureWidgetNodeProperties(serWidgetNode: SerializedComfyWidgetNode,
             if ((inputOpts as any)?.image_upload || (Array.isArray(inputType) && inputType.some((v: any) => typeof v === "string" && /\.(png|jpe?g|webp|gif|bmp)$/i.test(v)))) {
                 serWidgetNode.properties.imageUpload = true;
             }
+            if ((inputOpts as any)?.audio_upload || (inputOpts as any)?.upload === "audio" || (Array.isArray(inputType) && inputType.some((v: any) => typeof v === "string" && /\.(wav|mp3|flac|ogg|m4a|aac)$/i.test(v)))) {
+                serWidgetNode.properties.audioUpload = true;
+            }
             break;
     }
 }
@@ -520,6 +523,9 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
             if ((serWidgetNode.properties as any).imageUpload) {
                 (comfyWidgetNode as any).properties.imageUpload = true;
             }
+            if ((serWidgetNode.properties as any).audioUpload) {
+                (comfyWidgetNode as any).properties.audioUpload = true;
+            }
             if (value !== undefined) {
                 comfyWidgetNode.setValue(value);
             }
@@ -540,7 +546,6 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
         }
 
         // Add OUTPUT event slot to output nodes
-        // For now assume that all output nodes will send back images
         if (isOutputNode) {
             const newOutput: INodeOutputSlot = {
                 name: "OUTPUT",
@@ -555,10 +560,18 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
             node.outputs.push(newOutput)
             const connOutputIndex = node.outputs.length - 1;
 
-            // Let's create a gallery for this output node and hook it up
-            const [comfyGalleryNode, serGalleryNode] = createSerializedWidgetNode(
+            const isAudioOutput = Boolean(
+                def.nodeDef.category === "audio" ||
+                node.type === "PreviewAudio" ||
+                node.type === "SaveAudio" ||
+                node.type?.toLowerCase().includes("audio")
+            );
+            const widgetType = isAudioOutput ? "ui/audio" : "ui/gallery";
+
+            // Let's create an output widget (audio player or gallery) for this output node and hook it up
+            const [comfyOutputWidgetNode, serOutputWidgetNode] = createSerializedWidgetNode(
                 vanillaWorkflow,
-                "ui/gallery",
+                widgetType,
                 [],
                 node,
                 connOutputIndex,
@@ -568,15 +581,15 @@ export default function convertVanillaWorkflow(vanillaWorkflow: ComfyVanillaWork
             if (group == null)
                 group = layoutState.addContainer(isOutputNode ? right : left, { title: node.title || node.type })
 
-            const widget = layoutState.addWidget(group, comfyGalleryNode)
-            widget.attrs.title = "Output"
+            const widget = layoutState.addWidget(group, comfyOutputWidgetNode)
+            widget.attrs.title = isAudioOutput ? (node.title || "Audio Output") : "Output"
 
-            const connInputIndex = serGalleryNode.inputs?.findIndex(o => o.name === comfyGalleryNode.storeActionName)
+            const connInputIndex = serOutputWidgetNode.inputs?.findIndex(o => o.name === comfyOutputWidgetNode.storeActionName)
             if (connInputIndex != null) {
-                connectSerializedNodes(vanillaWorkflow, node, connOutputIndex, serGalleryNode, connInputIndex)
+                connectSerializedNodes(vanillaWorkflow, node, connOutputIndex, serOutputWidgetNode, connInputIndex)
             }
             else {
-                console.error("[convertVanillaWorkflow] No input to connect gallery widget into!", comfyGalleryNode.storeActionName, node)
+                console.error("[convertVanillaWorkflow] No input to connect output widget into!", comfyOutputWidgetNode.storeActionName, node)
             }
         }
     }

@@ -1458,6 +1458,17 @@ export default class ComfyApp {
                 comboNode.properties.imageUpload = true;
             }
 
+            const isAudioUpload = Boolean(
+                (opts as any)?.audio_upload ||
+                (opts as any)?.upload === "audio" ||
+                (comfyInput.config as any)?.audio_upload ||
+                comboNode.properties.audioUpload ||
+                backendNode.type === "LoadAudio"
+            );
+            if (isAudioUpload) {
+                comboNode.properties.audioUpload = true;
+            }
+
             const curVal = get(comboNode.value);
             let values = [...(rawValues as string[])];
             if (isImageUpload && curVal && !values.includes(curVal)) {

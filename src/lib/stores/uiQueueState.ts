@@ -15,6 +15,7 @@ export type QueueUIEntry = {
     date?: string,
     status: QueueUIEntryStatus,
     images?: ComfyImageLocation[], // URLs
+    audios?: ComfyImageLocation[], // Audio outputs
     details?: string, // shown in a tooltip on hover
     error?: WorkflowError
 }
@@ -77,7 +78,14 @@ function convertEntry(entry: QueueEntry, status: QueueUIEntryStatus): QueueUIEnt
 
     if (Object.keys(entry.outputs).length > 0) {
         const imageCount = Object.values(entry.outputs).filter(o => o.images).flatMap(o => o.images).length
-        submessage = `Images: ${imageCount}`
+        const audioCount = Object.values(entry.outputs).filter(o => o.audio).flatMap(o => o.audio).length
+        if (imageCount > 0 && audioCount > 0) {
+            submessage = `Images: ${imageCount}, Audio: ${audioCount}`
+        } else if (imageCount > 0) {
+            submessage = `Images: ${imageCount}`
+        } else if (audioCount > 0) {
+            submessage = `Audio: ${audioCount}`
+        }
     }
 
     return {
@@ -86,7 +94,8 @@ function convertEntry(entry: QueueEntry, status: QueueUIEntryStatus): QueueUIEnt
         submessage,
         date: dateStr,
         status,
-        images: []
+        images: [],
+        audios: []
     }
 }
 
@@ -105,6 +114,13 @@ function convertPendingEntry(entry: QueueEntry, status: QueueUIEntryStatus): Que
         result.images = result.images.concat(outputs)
     }
 
+    const audios = Object.values(entry.outputs)
+        .filter(o => o.audio)
+        .flatMap(o => o.audio)
+    if (audios) {
+        result.audios = result.audios.concat(audios)
+    }
+
     return result;
 }
 
@@ -115,6 +131,11 @@ function convertCompletedEntry(entry: CompletedQueueEntry): QueueUIEntry {
         .filter(o => o.images)
         .flatMap(o => o.images)
     result.images = images
+
+    const audios = Object.values(entry.entry.outputs)
+        .filter(o => o.audio)
+        .flatMap(o => o.audio)
+    result.audios = audios
 
     if (entry.message)
         result.submessage = entry.message

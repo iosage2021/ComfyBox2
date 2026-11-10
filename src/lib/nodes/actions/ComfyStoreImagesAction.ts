@@ -27,7 +27,7 @@ export default class ComfyStoreImagesAction extends ComfyGraphNode {
     }
 
     override onAction(action: any, param: any) {
-        if (action !== "store" || !param || !("images" in param))
+        if (action !== "store" || !param || (!("images" in param) && !("audio" in param)))
             return;
 
         this.setProperty("images", param as SerializedPromptOutput)

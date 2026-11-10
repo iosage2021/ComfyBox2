@@ -129,6 +129,9 @@ export default class ComfyGalleryNode extends ComfyWidgetNode<ComfyBoxImageMetad
             updateMode = param.updateMode || updateMode;
             param = param.galleryImages;
         }
+        else if (typeof param === "object" && param != null && Array.isArray(param.audio)) {
+            param = param.audio;
+        }
 
         const meta = parseWhateverIntoImageMetadata(param) || [];
 
